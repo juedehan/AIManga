@@ -1,0 +1,12 @@
+# 相关性阈值（0~1），可以根据实际检索效果调优
+score_threshold: 0.3
+
+# 检索器返回文档数量
+k: 7
+
+# reraak返回的数量
+rerank_top_k: 3
+
+#文档的相关性得分
+relevance_score: 0.5
+

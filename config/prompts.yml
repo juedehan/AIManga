@@ -1,0 +1,14 @@
+# 提示词文件路径配置（相对于项目根目录）
+# 所有提示词文件统一存放在 prompts/ 目录下，便于管理和版本控制
+
+features_agent_sysprompt: prompts/features_agent_sysprompt.txt
+optimize_prompts_agent_sysprompt: prompts/optimize_prompts_agent_sysprompt.txt
+portrait_agent_sysprompt: prompts/portrait_agent_sysprompt.txt
+rag_summarize_prompt_path: prompts/rag_summarize.txt
+commander_sysprompt: prompts/commander_sysprompt.txt
+#report_prompt_path: prompts/report_prompt.txt
+
+# 调试配置
+
+enable_chain_debug: false
+
