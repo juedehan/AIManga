@@ -2,7 +2,6 @@
 chat_model_name: qwen3-max
 # 向量模型名称（如 "text-embedding-v4"）
 embedding_model_name: text-embedding-v4
-
 # rerank模型
 rerank_model_name: qwen3-rerank
 # 文生图大模型名称
