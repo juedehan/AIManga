@@ -25,7 +25,7 @@ def log_before_agent(state: AgentState, runtime: Runtime) -> None:
     - 验证输入参数
     - 修改初始状态
     """
-    print(f"before_{runtime.context['agent_name']}", state)
+    #print(f"before_{runtime.context['agent_name']}", state)
     logger.info(f"[log_before_agent] Starting agent with {len(state['messages'])} messages")
 
 @after_agent
@@ -38,7 +38,7 @@ def log_after_agent(state: AgentState, runtime: Runtime) -> None:
     - 统计执行时间
     - 保存对话历史
     """
-    print(f"after_{runtime.context['agent_name']}", state)
+    #print(f"after_{runtime.context['agent_name']}", state)
     logger.info(f"[log_after_agent] Agent completed with {len(state['messages'])} messages")
 
 @before_model
@@ -47,7 +47,7 @@ def log_before_model(
         runtime: Runtime,           # 记录了整个执行过程中的上下文信息
 ):         # 在模型执行前输出日志
     logger.info(f"[log_before_model]即将调用模型，带有{len(state['messages'])}条消息。")
-    print("before_model",state)
+    #print("before_model",state)
     logger.debug(f"[log_before_model]{type(state['messages'][-1]).__name__} | {state['messages'][-1].content}")
 
     return None
@@ -64,4 +64,4 @@ def log_after_model(state: AgentState, runtime: Runtime) -> None:
     """
     if state["messages"]:
         logger.info(f"[log_after_model]模型调用完成")
-    print("after_model", state)
+    #print("after_model", state)

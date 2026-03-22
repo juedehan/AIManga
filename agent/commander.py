@@ -149,7 +149,7 @@ if __name__ == "__main__":
             await commander.setup()
 
             print("========== 测试 ==========")
-            res = await commander.execute("日常生活中林月的肖像")
+            res = await commander.execute("日常生活中青灵的肖像")
             print(res)
 
         finally:
