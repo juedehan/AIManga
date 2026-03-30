@@ -245,3 +245,79 @@ class CommanderToolbox:
             f"\033[32m[portrait_adjustment_agent] 完成角色调整: {resolved_character_name}, 图片路径: {image_path}\033[0m"
         )
         return image_path
+
+
+_mcp_toolbox = CommanderToolbox()
+
+
+def _mcp_prepare_toolbox(session_id: str, user_query: str) -> CommanderToolbox:
+    _mcp_toolbox.set_request_context(session_id=session_id, user_query=user_query)
+    return _mcp_toolbox
+
+
+def mcp_get_features(
+    session_id: str,
+    user_query: str,
+    character_name: str,
+    scene: str,
+) -> str:
+    """
+    通过 MCP 调用人物特征抽取工具。
+    session_id 和 user_query 由服务端注入，用于保持服务器侧会话上下文一致。
+    """
+    toolbox = _mcp_prepare_toolbox(session_id=session_id, user_query=user_query)
+    return toolbox.get_features(character_name=character_name, scene=scene)
+
+
+def mcp_opt_prompts(
+    session_id: str,
+    user_query: str,
+    literary_description: str,
+    gender: Optional[Literal["男", "女"]] = "未提及",
+) -> str:
+    """
+    通过 MCP 调用提示词优化工具。
+    session_id 和 user_query 由服务端注入，用于保持请求上下文一致。
+    """
+    toolbox = _mcp_prepare_toolbox(session_id=session_id, user_query=user_query)
+    return toolbox.opt_prompts(literary_description=literary_description, gender=gender)
+
+
+def mcp_get_portrait(
+    session_id: str,
+    user_query: str,
+    optimized_prompt: str,
+    character_name: str,
+    character_name_pinyin: str,
+    scene: str = "未提及",
+    gender: Optional[Literal["男", "女"]] = "未提及",
+) -> str:
+    """
+    通过 MCP 调用服务器侧出图工具，并写入当前会话的 portrait memory。
+    """
+    toolbox = _mcp_prepare_toolbox(session_id=session_id, user_query=user_query)
+    return toolbox.get_portrait(
+        optimized_prompt=optimized_prompt,
+        character_name=character_name,
+        character_name_pinyin=character_name_pinyin,
+        scene=scene,
+        gender=gender,
+    )
+
+
+def mcp_adjust_existing_portrait(
+    session_id: str,
+    user_query: str,
+    modification_request: str,
+    character_name: Optional[str] = None,
+    character_name_pinyin: Optional[str] = None,
+) -> str:
+    """
+    通过 MCP 调用服务器侧已有肖像调整工具。
+    """
+    toolbox = _mcp_prepare_toolbox(session_id=session_id, user_query=user_query)
+    return toolbox.adjust_existing_portrait(
+        modification_request=modification_request,
+        character_name=character_name,
+        character_name_pinyin=character_name_pinyin,
+    )

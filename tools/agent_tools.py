@@ -14,10 +14,16 @@ portrait_memory_store = PortraitMemoryStore(
 )
 
 
-@tool(description="从向量存储中检索参考资料")
-def rag_retrieve_context(query: str) -> str:
+def rag_retrieve_context_impl(query: str) -> str:
+    """从向量存储中检索参考资料。"""
     logger.info(f"\033[34m[rag_summarize]调用工具\033[0m")
     return rag.rag_retrieve_context(query)
+
+
+@tool(description="从向量存储中检索参考资料")
+def rag_retrieve_context(query: str) -> str:
+    """从向量存储中检索参考资料。"""
+    return rag_retrieve_context_impl(query)
 
 
 def resolve_latest_character_for_session(session_id: str) -> str | None:
@@ -79,5 +85,4 @@ def update_character_portrait_memory(
         latest_gender=latest_gender,
         last_user_request=last_user_request,
     )
-
 

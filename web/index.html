@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIManga Web</title>
+    <style>
+        :root {
+            --bg: #f5efe5;
+            --panel: rgba(255, 251, 245, 0.92);
+            --ink: #1f1d1a;
+            --muted: #6a6258;
+            --accent: #a1452f;
+            --accent-soft: #d97a4d;
+            --line: rgba(91, 63, 43, 0.18);
+            --user: #ead3bf;
+            --assistant: #fff8ef;
+            --shadow: 0 20px 60px rgba(76, 53, 37, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(173, 91, 61, 0.18), transparent 32%),
+                radial-gradient(circle at bottom right, rgba(104, 140, 116, 0.12), transparent 28%),
+                linear-gradient(135deg, #f9f4ec 0%, #efe3d3 100%);
+        }
+
+        .shell {
+            width: min(980px, calc(100vw - 32px));
+            margin: 32px auto;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            backdrop-filter: blur(14px);
+        }
+
+        .header {
+            padding: 24px 28px 18px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(135deg, rgba(161, 69, 47, 0.08), rgba(255, 255, 255, 0));
+        }
+
+        .title {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        .subtitle {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .session {
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .messages {
+            height: 68vh;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .message {
+            max-width: min(80%, 700px);
+            padding: 16px 18px;
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            animation: fade-up 220ms ease;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: var(--user);
+            border-bottom-right-radius: 8px;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: var(--assistant);
+            border-bottom-left-radius: 8px;
+        }
+
+        .message img {
+            display: block;
+            width: min(100%, 360px);
+            margin-top: 12px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 24px rgba(74, 50, 34, 0.14);
+        }
+
+        .composer {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 14px;
+            padding: 20px 24px 24px;
+            border-top: 1px solid var(--line);
+            background: rgba(255, 249, 242, 0.88);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 88px;
+            resize: vertical;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            padding: 14px 16px;
+            font: inherit;
+            color: var(--ink);
+            background: #fffdf9;
+            outline: none;
+        }
+
+        textarea:focus {
+            border-color: rgba(161, 69, 47, 0.42);
+            box-shadow: 0 0 0 3px rgba(161, 69, 47, 0.12);
+        }
+
+        button {
+            align-self: end;
+            height: 52px;
+            min-width: 118px;
+            border: 0;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+            color: #fff;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 12px 24px rgba(161, 69, 47, 0.26);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.58;
+            box-shadow: none;
+        }
+
+        .empty {
+            margin: auto;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        @keyframes fade-up {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="header">
+            <h1 class="title">AIManga Web</h1>
+            <p class="subtitle">在聊天框输入人物肖像需求，后端会在本机服务器侧完成检索、提示词优化和出图。</p>
+            <div class="session" id="sessionLabel">当前会话：加载中...</div>
+        </section>
+        <section class="messages" id="messages">
+            <div class="empty" id="emptyState">当前会话还没有消息，先发送一句试试。</div>
+        </section>
+        <form class="composer" id="chatForm">
+            <textarea id="messageInput" placeholder="例如：画出日常生活里高欣欣的肖像"></textarea>
+            <button id="sendButton" type="submit">发送</button>
+        </form>
+    </main>
+
+    <script>
+        const messagesEl = document.getElementById("messages");
+        const emptyStateEl = document.getElementById("emptyState");
+        const chatFormEl = document.getElementById("chatForm");
+        const messageInputEl = document.getElementById("messageInput");
+        const sendButtonEl = document.getElementById("sendButton");
+        const sessionLabelEl = document.getElementById("sessionLabel");
+
+        function setEmptyStateVisible(visible) {
+            emptyStateEl.style.display = visible ? "block" : "none";
+        }
+
+        function scrollMessagesToBottom() {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function createMessage(role, content = "", imageUrl = null) {
+            setEmptyStateVisible(false);
+            const bubble = document.createElement("article");
+            bubble.className = `message ${role}`;
+
+            const textNode = document.createElement("div");
+            textNode.textContent = content;
+            bubble.appendChild(textNode);
+
+            if (imageUrl) {
+                appendImageToBubble(bubble, imageUrl);
+            }
+
+            messagesEl.appendChild(bubble);
+            scrollMessagesToBottom();
+            return bubble;
+        }
+
+        function appendTextToBubble(bubble, text) {
+            const textNode = bubble.firstElementChild;
+            textNode.textContent += text;
+            scrollMessagesToBottom();
+        }
+
+        function appendImageToBubble(bubble, imageUrl) {
+            let image = bubble.querySelector("img");
+            if (!image) {
+                image = document.createElement("img");
+                image.alt = "生成结果";
+                bubble.appendChild(image);
+            }
+            image.src = imageUrl;
+            scrollMessagesToBottom();
+        }
+
+        function renderHistory(messages) {
+            messagesEl.innerHTML = "";
+            if (!messages.length) {
+                messagesEl.appendChild(emptyStateEl);
+                setEmptyStateVisible(true);
+                return;
+            }
+
+            messages.forEach((item) => {
+                createMessage(item.role, item.content || "", item.image_url || null);
+            });
+        }
+
+        async function loadHistory() {
+            const response = await fetch("/api/chat/history", { credentials: "same-origin" });
+            const payload = await response.json();
+            sessionLabelEl.textContent = `当前会话：${payload.session_id}`;
+            renderHistory(payload.messages || []);
+        }
+
+        function parseSseChunk(rawChunk) {
+            const lines = rawChunk.split("\n");
+            let event = "message";
+            const dataLines = [];
+
+            for (const line of lines) {
+                if (line.startsWith("event:")) {
+                    event = line.slice(6).trim();
+                } else if (line.startsWith("data:")) {
+                    dataLines.push(line.slice(5).trim());
+                }
+            }
+
+            const dataText = dataLines.join("\n");
+            let data = {};
+            if (dataText) {
+                data = JSON.parse(dataText);
+            }
+            return { event, data };
+        }
+
+        async function sendMessage(message) {
+            createMessage("user", message);
+            const assistantBubble = createMessage("assistant", "");
+
+            const response = await fetch("/api/chat/stream", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ message })
+            });
+
+            if (!response.ok || !response.body) {
+                appendTextToBubble(assistantBubble, "请求失败。");
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+
+                while (buffer.includes("\n\n")) {
+                    const boundary = buffer.indexOf("\n\n");
+                    const rawChunk = buffer.slice(0, boundary).trim();
+                    buffer = buffer.slice(boundary + 2);
+
+                    if (!rawChunk) {
+                        continue;
+                    }
+
+                    const { event, data } = parseSseChunk(rawChunk);
+                    if (event === "session" && data.session_id) {
+                        sessionLabelEl.textContent = `当前会话：${data.session_id}`;
+                    } else if (event === "delta" && data.text) {
+                        appendTextToBubble(assistantBubble, data.text);
+                    } else if (event === "image" && data.url) {
+                        appendImageToBubble(assistantBubble, data.url);
+                    } else if (event === "error" && data.message) {
+                        appendTextToBubble(assistantBubble, `\n${data.message}`);
+                    }
+                }
+            }
+        }
+
+        chatFormEl.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const message = messageInputEl.value.trim();
+            if (!message) {
+                return;
+            }
+
+            sendButtonEl.disabled = true;
+            messageInputEl.disabled = true;
+
+            try {
+                await sendMessage(message);
+                messageInputEl.value = "";
+            } finally {
+                sendButtonEl.disabled = false;
+                messageInputEl.disabled = false;
+                messageInputEl.focus();
+            }
+        });
+
+        loadHistory().catch((error) => {
+            console.error(error);
+            setEmptyStateVisible(false);
+            createMessage("assistant", "聊天历史加载失败，请刷新页面重试。");
+        });
+    </script>
+</body>
+</html>
