@@ -1,0 +1,12 @@
+novel_splitter:
+  input_file: novel/YiShouMiCheng.txt
+  output_dir: data
+  volume_titles:
+    - 第一卷
+    - 第二卷
+    - 第三卷
+    - 第四卷
+    - 第五卷
+    - 第六卷
+    - 第七卷
+    - 第八卷

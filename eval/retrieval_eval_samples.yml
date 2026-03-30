@@ -1,0 +1,52 @@
+- query: 青灵在非战斗场景下的外貌描写
+  target_character: 青灵
+  required_scene: daily
+  required_attributes: [外貌, 身材, 气质]
+  gold_spans:
+    - 马尾女孩名叫青灵，身高1米67
+    - 脸蛋漂亮自不用说
+    - 紧身运动衣下凹凸有致的身体曲线
+
+- query: 青灵战斗时的神态描写
+  target_character: 青灵
+  required_scene: battle
+  required_attributes: [神态]
+  gold_spans:
+    - 青灵御刀飞行，在斗虎身旁降落
+    - 满脸汗水和血水，粘着几缕黑色发丝，胸口起伏剧烈
+
+- query: 李薇薇的衣着描写
+  target_character: 李薇薇
+  required_scene: daily
+  required_attributes: [衣着]
+  gold_spans:
+    - 李薇薇换上淡绿色的毛衣
+    - 头发柔顺地披在肩上
+
+- query: 万思思在水果店时的外貌和衣着描写
+  target_character: 万思思
+  required_scene: daily
+  required_attributes: [外貌, 衣着]
+  gold_spans:
+    - 身材纤细的女孩穿着洁白的短袖制服和绀色格子裙
+    - 柔顺的中短发搭落在白皙的脸庞上
+
+- query: 高阳父亲的外貌描写
+  required_scene: daily
+  required_attributes: [外貌]
+  gold_spans:
+    - 他高大健壮，小腹有些隆起
+    - 眉目间还依稀能见年轻时的俊朗
+
+- query: 青灵对男生的态度和气质描写
+  target_character: 青灵
+  required_scene: daily
+  required_attributes: [气质, 神态]
+  gold_spans:
+    - 看男生的眼神总是透露出一股看到苍蝇的生理厌恶
+    - 青灵几乎没有追求者
+
+- query: 青灵的酒窝描写
+  target_character: 青灵
+  required_attributes: [外貌]
+  expect_no_answer: true

@@ -6,3 +6,9 @@ embedding_model_name: text-embedding-v4
 rerank_model_name: qwen3-rerank
 # 文生图大模型名称
 image_model_name: doubao-seedream-5-0-260128
+# 文生图服务端点
+image_base_url: https://ark.cn-beijing.volces.com/api/v3
+# 图片生成默认参数
+image_size: 2K
+image_response_format: url
+image_watermark: true

@@ -1,6 +1,5 @@
-import os
 from abc import ABC, abstractmethod
-from typing import Optional, Union, Any
+from typing import Optional, Any
 from http import HTTPStatus
 
 import dashscope
@@ -12,20 +11,14 @@ from langchain_community.chat_models.tongyi import BaseChatModel
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_community.chat_models.tongyi import ChatTongyi
 
-from utils.config_handler import load_model_config
+from utils.config_handler import model_conf
 
-# 确保环境变量被加载
 load_dotenv()
-model_conf = load_model_config()
+
+
 class RerankModel:
     """
     百炼 rerank 客户端封装
-    用法：
-        rerank_model.rerank(
-            query="什么是文本排序模型",
-            documents=["...", "..."],
-            top_n=5
-        )
     """
 
     def __init__(self, model_name: str):
@@ -46,13 +39,14 @@ class RerankModel:
             return_documents=return_documents,
         )
 
-        if resp.status_code != HTTPStatus.OK:
+        if not resp.status_code == HTTPStatus.OK:
             raise RuntimeError(f"Rerank 调用失败: {resp}")
 
         return resp
 
-# 扩充类型提示：加入 OpenAI 类型，以兼容文生图客户端，后续可加入视频模型，语音模型等
+
 ModelType = Optional[Embeddings | BaseChatModel | OpenAI | RerankModel]
+
 
 class BaseModelFactory(ABC):
     @abstractmethod
@@ -72,16 +66,13 @@ class EmbeddingsFactory(BaseModelFactory):
 
 class ImageModelFactory(BaseModelFactory):
     def generator(self) -> ModelType:
-        return OpenAI(
-            base_url="https://ark.cn-beijing.volces.com/api/v3",
-            # api_key 会自动读取 os.getenv("ARK_API_KEY") 或者 os.getenv("OPENAI_API_KEY")
-        )
+        return OpenAI(base_url=model_conf["image_base_url"])
+
 
 class RerankModelFactory(BaseModelFactory):
     def generator(self) -> ModelType:
         return RerankModel(model_name=model_conf["rerank_model_name"])
 
-# ================= 实例化 =================
 
 chat_model = ChatModelFactory().generator()
 embed_model = EmbeddingsFactory().generator()

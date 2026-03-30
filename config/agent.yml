@@ -1,6 +1,6 @@
-
 # 外部数据文件路径（相对于项目根目录），供 usage_report 等工具使用
 external_data_path: data/external/records.csv
+
 agent:
   # 智能体类型，目前规划为 ReAct
   type: react
@@ -14,10 +14,13 @@ agent:
     - name: usage_report
       description: 根据用户使用数据生成报告与优化建议
 
+commander:
+  default_mode: langchain
+  mcp_server_path: mcp/mcp_server.py
+  mcp_server_command: python3
+
 conversation:
   # 单个会话中保留的历史轮次数量
   max_history_turns: 10
   # 默认对话语言
   language: zh
-
-

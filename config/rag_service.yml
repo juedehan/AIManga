@@ -1,0 +1,109 @@
+attribute_groups:
+  appearance:
+    - 外貌
+    - 容貌
+    - 长相
+    - 脸蛋
+    - 五官
+    - 皮肤
+    - 发型
+    - 脸庞
+  figure:
+    - 身材
+    - 体态
+    - 高挑
+    - 长腿
+    - 曲线
+  clothing:
+    - 衣着
+    - 穿着
+    - 装束
+    - 制服
+    - 毛衣
+    - 裙
+    - 运动衣
+    - 衣服
+  temperament:
+    - 气质
+    - 神韵
+    - 厌恶
+    - 冷淡
+    - 温柔
+    - 冷冷
+    - 女神
+  expression:
+    - 神态
+    - 眼神
+    - 表情
+    - 微笑
+    - 笑容
+    - 脸色
+
+scene_query_keywords:
+  battle:
+    - 战斗
+    - 打斗
+    - 激战
+    - 交手
+    - 厮杀
+    - 对战
+    - 战损
+  daily:
+    - 日常
+    - 平时
+    - 生活
+    - 校园
+    - 约会
+    - 非战斗
+    - 没有打斗
+
+scene_query_aliases:
+  battle:
+    - 战斗
+    - 打斗
+    - 神态
+  daily:
+    - 日常
+    - 平时
+    - 生活
+    - 校园
+
+stop_candidates:
+  - 关于
+  - 没有
+  - 哪些
+  - 什么
+  - 怎么
+  - 一个
+  - 角色
+  - 人物
+  - 场景
+  - 描写
+  - 资料
+  - 要求
+
+appearance_attribute_groups:
+  - appearance
+  - figure
+  - clothing
+  - temperament
+  - expression
+
+emotion_attribute_groups:
+  - temperament
+  - expression
+
+
+daily_negative_scene_tokens:
+  - 非战斗
+  - 没有打斗
+  - 不打斗
+  - 不是战斗
+
+query_variant_trigger_groups:
+  appearance:
+    - clothing
+    - appearance
+  expression:
+    - temperament
+    - expression

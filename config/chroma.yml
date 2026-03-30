@@ -1,4 +1,3 @@
-
 # 向量库类型，目前计划使用 chromadb
 type: chromadb
 # 持久化目录，基于项目根目录，相对路径即可
@@ -7,22 +6,17 @@ persist_directory: chroma_db
 collection_name: agent
 # 向量集合名称
 
-
 # 资料存储路径
 data_path: data
 # MD5 校验文件存储路径
 md5_hex_store: md5.text
 
-
 # 允许的知识文件类型
-allow_knowledge_file_type: [".txt", ".doc",".docx"]
-
+allow_knowledge_file_type: [".txt", ".pdf"]
 
 # 文本分块大小
-chunk_size: 200
+chunk_size: 500
 # 分块重叠大小
-chunk_overlap: 20
+chunk_overlap: 60
 # 文本分块分隔符（按优先级排序）
 separators: ["\n\n", "\n", ". ", "! ", "?", ""]
-
-
