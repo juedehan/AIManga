@@ -19,6 +19,11 @@ commander:
   mcp_server_path: mcp/mcp_server.py
   mcp_server_command: python3
 
+memory:
+  enabled: true
+  store_path: memory/portrait_memory.sqlite3
+  max_adjustment_history: 10
+
 conversation:
   # 单个会话中保留的历史轮次数量
   max_history_turns: 10

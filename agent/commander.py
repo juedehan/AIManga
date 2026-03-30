@@ -27,7 +27,7 @@ from middleware.middleware import (
     log_after_model,
 )
 
-from tools.commander_tools import get_features, opt_prompts, get_portrait
+from tools.commander_tools import CommanderToolbox
 
 from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import StdioServerParameters
@@ -49,6 +49,7 @@ class Commander:
 
         self.agent = None
         self.langchain_tools = []
+        self.toolbox = CommanderToolbox()
         self.exit_stack = AsyncExitStack()
         self.mcp_session: Optional[ClientSession] = None
 
@@ -57,9 +58,10 @@ class Commander:
             logger.info("\033[33m正在以本地 LangChain Tool 模式启动......\033[0m")
 
             self.langchain_tools = [
-                tool(get_features),
-                tool(opt_prompts),
-                tool(get_portrait),
+                tool(self.toolbox.get_features),
+                tool(self.toolbox.opt_prompts),
+                tool(self.toolbox.get_portrait),
+                tool(self.toolbox.adjust_existing_portrait),
             ]
 
             tool_names = [t.name for t in self.langchain_tools]
@@ -103,9 +105,12 @@ class Commander:
             ],
         )
 
-    async def execute(self, user_query: str) -> str:
+    async def execute(self, user_query: str, session_id: str) -> str:
         if self.agent is None:
             raise RuntimeError("Commander 尚未初始化，请先调用 await commander.setup()")
+
+        if self.mode == "langchain":
+            self.toolbox.set_request_context(session_id=session_id, user_query=user_query)
 
         input_dict = {"messages": [("human", user_query)]}
         response = await self.agent.ainvoke(input_dict, context={"agent_name": "commander"})
@@ -131,7 +136,7 @@ if __name__ == "__main__":
         try:
             await commander.setup()
             print("========== 测试 ==========")
-            res = await commander.execute("画出日常生活里高欣欣的肖像")
+            res = await commander.execute("画出日常生活里高欣欣的肖像", session_id="demo-session")
             print(res)
         finally:
             await commander.close()

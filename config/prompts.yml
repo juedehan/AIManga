@@ -4,6 +4,7 @@
 features_agent_sysprompt: prompts/features_agent_sysprompt.txt
 optimize_prompts_agent_sysprompt: prompts/optimize_prompts_agent_sysprompt.txt
 portrait_agent_sysprompt: prompts/portrait_agent_sysprompt.txt
+portrait_adjustment_agent_sysprompt: prompts/portrait_adjustment_agent_sysprompt.txt
 rag_summarize_prompt_path: prompts/rag_summarize.txt
 commander_sysprompt: prompts/commander_sysprompt.txt
 #report_prompt_path: prompts/report_prompt.txt
@@ -11,4 +12,3 @@ commander_sysprompt: prompts/commander_sysprompt.txt
 # 调试配置
 
 enable_chain_debug: false
-
