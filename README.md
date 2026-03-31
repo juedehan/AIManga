@@ -30,5 +30,4 @@ image_model_name: doubao-seedream-5-0-260128
 大学生还可以进行认证，在高校认证后还能有300人民币额度 
 >https://university.aliyun.com/?spm=5176.30260724.J_4NWEMkQ5nDwOgLi8EJmHs.23.15c7db575OivtJ
 
-简单来说，这个项目就是采用了主从架构的设计思想，一个主Agent控制三个从Agent干活，主Agent就是`/agent/commander.py`
-在`commander`中输入想要的人物肖像然后运行，就会自动检索小说中的肖像生成，如果对结果不满意，可以自行更改`/prompts`里的各个agent的sysprompt
+目前只做了给人物画肖像的功能，后续还会增加场景分镜等
