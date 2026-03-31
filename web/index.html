@@ -101,6 +101,85 @@
             border-bottom-left-radius: 8px;
         }
 
+        .message-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .message-role {
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .message-status {
+            font-size: 12px;
+            color: var(--muted);
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(91, 63, 43, 0.08);
+        }
+
+        .message-status.running {
+            color: #8e4a18;
+            background: rgba(217, 122, 77, 0.16);
+        }
+
+        .message-status.interrupting {
+            color: #875300;
+            background: rgba(226, 181, 75, 0.18);
+        }
+
+        .message-status.interrupted {
+            color: #9b2f2f;
+            background: rgba(190, 74, 74, 0.12);
+        }
+
+        .message-status.done {
+            color: #27624a;
+            background: rgba(69, 147, 101, 0.12);
+        }
+
+        .process-panel {
+            margin-bottom: 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(91, 63, 43, 0.12);
+            background: rgba(246, 238, 227, 0.92);
+            overflow: hidden;
+        }
+
+        .process-title {
+            padding: 10px 14px;
+            font-size: 12px;
+            color: var(--muted);
+            border-bottom: 1px solid rgba(91, 63, 43, 0.1);
+            background: rgba(255, 255, 255, 0.55);
+        }
+
+        .process-body {
+            max-height: 180px;
+            overflow-y: auto;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .process-line {
+            font-size: 13px;
+            color: #5f574d;
+            line-height: 1.5;
+        }
+
+        .result-body {
+            min-height: 28px;
+        }
+
         .message img {
             display: block;
             width: min(100%, 360px);
@@ -112,7 +191,7 @@
 
         .composer {
             display: grid;
-            grid-template-columns: 1fr auto;
+            grid-template-columns: 1fr auto auto;
             gap: 14px;
             padding: 20px 24px 24px;
             border-top: 1px solid var(--line);
@@ -157,6 +236,10 @@
             box-shadow: none;
         }
 
+        .secondary-button {
+            background: linear-gradient(135deg, #826752, #a88466);
+        }
+
         .empty {
             margin: auto;
             color: var(--muted);
@@ -188,6 +271,7 @@
         <form class="composer" id="chatForm">
             <textarea id="messageInput" placeholder="例如：画出日常生活里高欣欣的肖像"></textarea>
             <button id="sendButton" type="submit">发送</button>
+            <button id="interruptButton" class="secondary-button" type="button" disabled>打断</button>
         </form>
     </main>
 
@@ -197,7 +281,28 @@
         const chatFormEl = document.getElementById("chatForm");
         const messageInputEl = document.getElementById("messageInput");
         const sendButtonEl = document.getElementById("sendButton");
+        const interruptButtonEl = document.getElementById("interruptButton");
         const sessionLabelEl = document.getElementById("sessionLabel");
+        const requestState = {
+            busy: false,
+            interrupting: false,
+            currentRequestId: null,
+            currentAssistantView: null,
+        };
+
+        function sanitizeAssistantText(content) {
+            if (!content) {
+                return "";
+            }
+
+            let sanitized = content.replace(/!\[[^\]]*\]\([^)]+\)/g, "");
+            sanitized = sanitized.replace(
+                /(^|\n)[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|webp)|\/?images\/\S+\.(?:png|jpe?g|webp)|\/[^\s]+\.(?:png|jpe?g|webp))[ \t]*(?=\n|$)/gim,
+                "$1"
+            );
+            sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
+            return sanitized.trim();
+        }
 
         function setEmptyStateVisible(visible) {
             emptyStateEl.style.display = visible ? "block" : "none";
@@ -207,36 +312,120 @@
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        function createMessage(role, content = "", imageUrl = null) {
+        function setComposerState() {
+            sendButtonEl.disabled = requestState.busy;
+            interruptButtonEl.disabled = !requestState.busy;
+            messageInputEl.disabled = requestState.busy;
+
+            if (requestState.interrupting) {
+                interruptButtonEl.textContent = "中断中";
+            } else {
+                interruptButtonEl.textContent = "打断";
+            }
+        }
+
+        function createMessage(role, content = "", imageUrl = null, options = {}) {
             setEmptyStateVisible(false);
             const bubble = document.createElement("article");
             bubble.className = `message ${role}`;
 
-            const textNode = document.createElement("div");
-            textNode.textContent = content;
-            bubble.appendChild(textNode);
+            const showProcess = !!options.showProcess;
+            const header = document.createElement("div");
+            header.className = "message-header";
 
-            if (imageUrl) {
-                appendImageToBubble(bubble, imageUrl);
+            const roleLabel = document.createElement("div");
+            roleLabel.className = "message-role";
+            roleLabel.textContent = role === "user" ? "User" : "Assistant";
+            header.appendChild(roleLabel);
+
+            const statusEl = document.createElement("div");
+            statusEl.className = "message-status";
+            statusEl.textContent = options.statusText || "";
+            if (options.statusClass) {
+                statusEl.classList.add(options.statusClass);
+            }
+            if (!statusEl.textContent) {
+                statusEl.style.display = "none";
+            }
+            header.appendChild(statusEl);
+
+            bubble.appendChild(header);
+
+            let processBody = null;
+            if (showProcess) {
+                const processPanel = document.createElement("div");
+                processPanel.className = "process-panel";
+
+                const processTitle = document.createElement("div");
+                processTitle.className = "process-title";
+                processTitle.textContent = "运行过程";
+                processPanel.appendChild(processTitle);
+
+                processBody = document.createElement("div");
+                processBody.className = "process-body";
+                processPanel.appendChild(processBody);
+                bubble.appendChild(processPanel);
             }
 
+            const resultBody = document.createElement("div");
+            resultBody.className = "result-body";
+            const initialText = role === "assistant" ? sanitizeAssistantText(content) : content;
+            resultBody.textContent = initialText;
+            bubble.appendChild(resultBody);
+
             messagesEl.appendChild(bubble);
+            const messageView = {
+                bubble,
+                resultBody,
+                processBody,
+                statusEl,
+                rawText: content || "",
+            };
+
+            if (imageUrl) {
+                appendImageToBubble(messageView, imageUrl);
+            }
+
             scrollMessagesToBottom();
-            return bubble;
+            return messageView;
         }
 
-        function appendTextToBubble(bubble, text) {
-            const textNode = bubble.firstElementChild;
-            textNode.textContent += text;
+        function setBubbleStatus(messageView, text, statusClass) {
+            if (!messageView?.statusEl) {
+                return;
+            }
+            messageView.statusEl.style.display = text ? "inline-flex" : "none";
+            messageView.statusEl.textContent = text || "";
+            messageView.statusEl.className = "message-status";
+            if (statusClass) {
+                messageView.statusEl.classList.add(statusClass);
+            }
+        }
+
+        function appendTextToBubble(messageView, text) {
+            messageView.rawText += text;
+            messageView.resultBody.textContent = sanitizeAssistantText(messageView.rawText);
             scrollMessagesToBottom();
         }
 
-        function appendImageToBubble(bubble, imageUrl) {
-            let image = bubble.querySelector("img");
+        function appendProcessToBubble(messageView, text) {
+            if (!messageView?.processBody) {
+                return;
+            }
+            const line = document.createElement("div");
+            line.className = "process-line";
+            line.textContent = text;
+            messageView.processBody.appendChild(line);
+            messageView.processBody.scrollTop = messageView.processBody.scrollHeight;
+            scrollMessagesToBottom();
+        }
+
+        function appendImageToBubble(messageView, imageUrl) {
+            let image = messageView.bubble.querySelector("img");
             if (!image) {
                 image = document.createElement("img");
                 image.alt = "生成结果";
-                bubble.appendChild(image);
+                messageView.bubble.appendChild(image);
             }
             image.src = imageUrl;
             scrollMessagesToBottom();
@@ -285,7 +474,12 @@
 
         async function sendMessage(message) {
             createMessage("user", message);
-            const assistantBubble = createMessage("assistant", "");
+            const assistantView = createMessage("assistant", "", null, {
+                showProcess: true,
+                statusText: "运行中",
+                statusClass: "running",
+            });
+            requestState.currentAssistantView = assistantView;
 
             const response = await fetch("/api/chat/stream", {
                 method: "POST",
@@ -297,13 +491,15 @@
             });
 
             if (!response.ok || !response.body) {
-                appendTextToBubble(assistantBubble, "请求失败。");
+                appendTextToBubble(assistantView, "请求失败。");
+                setBubbleStatus(assistantView, "失败", "");
                 return;
             }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder("utf-8");
             let buffer = "";
+            let interrupted = false;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -325,14 +521,29 @@
                     const { event, data } = parseSseChunk(rawChunk);
                     if (event === "session" && data.session_id) {
                         sessionLabelEl.textContent = `当前会话：${data.session_id}`;
+                        requestState.currentRequestId = data.request_id || null;
+                    } else if (event === "process" && data.message) {
+                        appendProcessToBubble(assistantView, data.message);
                     } else if (event === "delta" && data.text) {
-                        appendTextToBubble(assistantBubble, data.text);
+                        appendTextToBubble(assistantView, data.text);
                     } else if (event === "image" && data.url) {
-                        appendImageToBubble(assistantBubble, data.url);
+                        appendImageToBubble(assistantView, data.url);
+                    } else if (event === "interrupted") {
+                        interrupted = true;
+                        appendProcessToBubble(assistantView, data.message || "本轮已中断。");
+                        setBubbleStatus(assistantView, "已中断", "interrupted");
+                        return;
                     } else if (event === "error" && data.message) {
-                        appendTextToBubble(assistantBubble, `\n${data.message}`);
+                        appendTextToBubble(assistantView, `\n${data.message}`);
+                        setBubbleStatus(assistantView, "失败", "");
+                    } else if (event === "done") {
+                        setBubbleStatus(assistantView, "已完成", "done");
                     }
                 }
+            }
+
+            if (!interrupted) {
+                setBubbleStatus(assistantView, "已完成", "done");
             }
         }
 
@@ -343,16 +554,49 @@
                 return;
             }
 
-            sendButtonEl.disabled = true;
-            messageInputEl.disabled = true;
+            requestState.busy = true;
+            requestState.interrupting = false;
+            requestState.currentRequestId = null;
+            setComposerState();
 
             try {
                 await sendMessage(message);
                 messageInputEl.value = "";
             } finally {
-                sendButtonEl.disabled = false;
-                messageInputEl.disabled = false;
+                requestState.busy = false;
+                requestState.interrupting = false;
+                requestState.currentRequestId = null;
+                requestState.currentAssistantView = null;
+                setComposerState();
                 messageInputEl.focus();
+            }
+        });
+
+        interruptButtonEl.addEventListener("click", async () => {
+            if (!requestState.busy || requestState.interrupting) {
+                return;
+            }
+
+            requestState.interrupting = true;
+            setComposerState();
+
+            if (requestState.currentAssistantView) {
+                appendProcessToBubble(requestState.currentAssistantView, "已发送中断请求，等待当前轮次停止。");
+                setBubbleStatus(requestState.currentAssistantView, "中断中", "interrupting");
+            }
+
+            try {
+                await fetch("/api/chat/interrupt", {
+                    method: "POST",
+                    credentials: "same-origin",
+                });
+            } catch (error) {
+                console.error(error);
+                if (requestState.currentAssistantView) {
+                    appendProcessToBubble(requestState.currentAssistantView, "中断请求发送失败。");
+                }
+                requestState.interrupting = false;
+                setComposerState();
             }
         });
 
@@ -361,6 +605,8 @@
             setEmptyStateVisible(false);
             createMessage("assistant", "聊天历史加载失败，请刷新页面重试。");
         });
+
+        setComposerState();
     </script>
 </body>
 </html>

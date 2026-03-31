@@ -2,8 +2,9 @@ import importlib.util
 import sys
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncIterator, Literal, Optional
+from typing import Any, AsyncIterator, Callable, Literal, Optional
 from contextlib import AsyncExitStack
 
 _BOOTSTRAP_PATH = Path(__file__).resolve().parents[1] / "bootstrap.py"
@@ -38,11 +39,16 @@ from mcp.client.session import ClientSession
 from mcp.types import CallToolResult, TextContent
 
 
+class CommanderInterruptedError(Exception):
+    """当前轮次被外部中断。"""
+
+
 @dataclass
 class CommanderRequestRuntime:
     session_id: str
     user_query: str
-    image_paths: list[str] = field(default_factory=list)
+    pending_events: list[dict[str, Any]] = field(default_factory=list)
+    cancel_checker: Callable[[], bool] | None = None
 
 
 class Commander:
@@ -75,6 +81,31 @@ class Commander:
             raise RuntimeError("当前请求缺少 Commander 会话上下文")
         return runtime
 
+    def _check_cancelled(self) -> None:
+        runtime = self._require_request_runtime()
+        if runtime.cancel_checker and runtime.cancel_checker():
+            raise CommanderInterruptedError("当前轮次已被中断")
+
+    def _queue_runtime_event(self, event: dict[str, Any]) -> None:
+        runtime = self._require_request_runtime()
+        runtime.pending_events.append(event)
+
+    def _queue_process_event(self, stage: str, message: str) -> None:
+        self._queue_runtime_event(
+            {
+                "event": "process",
+                "stage": stage,
+                "message": message,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
+
+    def _drain_runtime_events(self) -> list[dict[str, Any]]:
+        runtime = self._require_request_runtime()
+        queued = list(runtime.pending_events)
+        runtime.pending_events.clear()
+        return queued
+
     def _extract_text_from_call_result(self, result: CallToolResult) -> str:
         text_parts: list[str] = []
         for item in result.content:
@@ -106,15 +137,33 @@ class Commander:
         if self.mcp_session is None:
             raise RuntimeError("MCP Session 尚未初始化")
 
+        tool_start_messages = {
+            "get_features": "正在调用 get_features，提取角色特征。",
+            "opt_prompts": "正在调用 opt_prompts，优化绘画提示词。",
+            "get_portrait": "正在调用 get_portrait，开始出图。",
+            "adjust_existing_portrait": "正在调用 adjust_existing_portrait，调整已有肖像。",
+        }
+        tool_done_messages = {
+            "get_features": "get_features 已完成。",
+            "opt_prompts": "opt_prompts 已完成。",
+            "get_portrait": "get_portrait 已完成。",
+            "adjust_existing_portrait": "adjust_existing_portrait 已完成。",
+        }
+
+        self._check_cancelled()
+        self._queue_process_event("tool_call", tool_start_messages.get(tool_name, f"正在调用 {tool_name}。"))
         result = await self.mcp_session.call_tool(tool_name, arguments=arguments)
+        self._check_cancelled()
         text = self._extract_text_from_call_result(result)
 
         if getattr(result, "isError", False):
             raise RuntimeError(text or f"MCP tool 调用失败: {tool_name}")
 
+        self._queue_process_event("tool_done", tool_done_messages.get(tool_name, f"{tool_name} 已完成。"))
+
         if tool_name in {"get_portrait", "adjust_existing_portrait"} and self._is_image_path(text):
-            runtime = self._require_request_runtime()
-            runtime.image_paths.append(text.strip())
+            self._queue_runtime_event({"event": "image", "image_path": text.strip()})
+            self._queue_process_event("image_ready", "已收到生成图片。")
 
         return text
 
@@ -265,11 +314,20 @@ class Commander:
             ],
         )
 
-    async def execute_stream(self, user_query: str, session_id: str) -> AsyncIterator[dict[str, str]]:
+    async def execute_stream(
+        self,
+        user_query: str,
+        session_id: str,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
         if self.agent is None:
             raise RuntimeError("Commander 尚未初始化，请先调用 await commander.setup()")
 
-        runtime = CommanderRequestRuntime(session_id=session_id, user_query=user_query)
+        runtime = CommanderRequestRuntime(
+            session_id=session_id,
+            user_query=user_query,
+            cancel_checker=should_cancel,
+        )
         token = self.request_runtime.set(runtime)
 
         if self.mode == "langchain":
@@ -277,18 +335,26 @@ class Commander:
 
         input_dict = {"messages": [("human", user_query)]}
         latest_full_text = ""
-        emitted_image_count = 0
 
         try:
+            self._queue_process_event("request_received", "已收到请求，准备处理。")
+            for event in self._drain_runtime_events():
+                yield event
+
+            self._check_cancelled()
+            self._queue_process_event("agent_start", "主控代理开始分析请求。")
+            for event in self._drain_runtime_events():
+                yield event
+
             if hasattr(self.agent, "astream"):
                 async for step in self.agent.astream(
                     input_dict,
                     stream_mode="values",
                     context={"agent_name": "commander"},
                 ):
-                    while emitted_image_count < len(runtime.image_paths):
-                        yield {"event": "image", "image_path": runtime.image_paths[emitted_image_count]}
-                        emitted_image_count += 1
+                    self._check_cancelled()
+                    for event in self._drain_runtime_events():
+                        yield event
 
                     latest_message = step["messages"][-1]
                     if isinstance(latest_message, AIMessage):
@@ -299,6 +365,9 @@ class Commander:
                             yield {"event": "delta", "text": delta_text}
             else:
                 response = await self.agent.ainvoke(input_dict, context={"agent_name": "commander"})
+                self._check_cancelled()
+                for event in self._drain_runtime_events():
+                    yield event
                 latest_message = response["messages"][-1]
                 if isinstance(latest_message, AIMessage):
                     current_text = self._coerce_message_text(latest_message.content).strip()
@@ -306,9 +375,10 @@ class Commander:
                         latest_full_text = current_text
                         yield {"event": "delta", "text": current_text}
 
-            while emitted_image_count < len(runtime.image_paths):
-                yield {"event": "image", "image_path": runtime.image_paths[emitted_image_count]}
-                emitted_image_count += 1
+            self._check_cancelled()
+            self._queue_process_event("reply_complete", "当前回复已完成。")
+            for event in self._drain_runtime_events():
+                yield event
 
             if not latest_full_text:
                 yield {"event": "delta", "text": "未能生成有效回复"}

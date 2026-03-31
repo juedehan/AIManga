@@ -1,8 +1,11 @@
 import importlib.util
+import asyncio
 import json
+import re
 import sys
 import uuid
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -18,7 +21,7 @@ _bootstrap = importlib.util.module_from_spec(_BOOTSTRAP_SPEC)
 _BOOTSTRAP_SPEC.loader.exec_module(_bootstrap)
 _bootstrap.ensure_project_root()
 
-from agent.commander import Commander
+from agent.commander import Commander, CommanderInterruptedError
 from memory.chat_history_store import ChatHistoryStore
 from utils.config_handler import agent_conf
 from utils.logger_handler import logger
@@ -34,8 +37,34 @@ class ChatRequest(BaseModel):
     message: str
 
 
+@dataclass
+class ActiveRequest:
+    request_id: str
+    cancel_event: asyncio.Event
+
+    def cancel(self) -> None:
+        self.cancel_event.set()
+
+    def is_cancelled(self) -> bool:
+        return self.cancel_event.is_set()
+
+
 def build_sse_event(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def sanitize_assistant_text(content: str) -> str:
+    if not content:
+        return ""
+
+    sanitized = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", content)
+    sanitized = re.sub(
+        r"(?im)^[ \t]*(?:https?://\S+\.(?:png|jpe?g|webp)|/?images/\S+\.(?:png|jpe?g|webp)|/[^\s]+\.(?:png|jpe?g|webp))[ \t]*$",
+        "",
+        sanitized,
+    )
+    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized)
+    return sanitized.strip()
 
 
 def ensure_session_id(request: Request) -> tuple[str, bool]:
@@ -74,6 +103,8 @@ async def lifespan(app: FastAPI):
     await commander.setup()
     app.state.commander = commander
     app.state.chat_store = chat_store
+    app.state.active_requests: dict[str, ActiveRequest] = {}
+    app.state.active_requests_lock = asyncio.Lock()
     try:
         yield
     finally:
@@ -82,6 +113,26 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AIManga Web", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=get_abs_path("web")), name="static")
+
+
+async def register_active_request(request: Request, session_id: str, active_request: ActiveRequest) -> None:
+    async with request.app.state.active_requests_lock:
+        existing = request.app.state.active_requests.get(session_id)
+        if existing is not None:
+            existing.cancel()
+        request.app.state.active_requests[session_id] = active_request
+
+
+async def clear_active_request(request: Request, session_id: str, request_id: str) -> None:
+    async with request.app.state.active_requests_lock:
+        existing = request.app.state.active_requests.get(session_id)
+        if existing is not None and existing.request_id == request_id:
+            request.app.state.active_requests.pop(session_id, None)
+
+
+async def get_active_request(request: Request, session_id: str) -> ActiveRequest | None:
+    async with request.app.state.active_requests_lock:
+        return request.app.state.active_requests.get(session_id)
 
 
 @app.get("/")
@@ -109,26 +160,44 @@ async def chat_stream(payload: ChatRequest, request: Request):
     commander: Commander = request.app.state.commander
     chat_store: ChatHistoryStore = request.app.state.chat_store
     user_message = payload.message.strip()
+    active_request = ActiveRequest(request_id=uuid.uuid4().hex, cancel_event=asyncio.Event())
 
     async def event_generator():
         assistant_parts: list[str] = []
         image_url: str | None = None
 
-        yield build_sse_event("session", {"session_id": session_id})
+        await register_active_request(request, session_id, active_request)
+        yield build_sse_event("session", {"session_id": session_id, "request_id": active_request.request_id})
 
         if not user_message:
             error_message = "消息不能为空。"
             chat_store.append_message(session_id=session_id, role="assistant", content=error_message)
             yield build_sse_event("error", {"message": error_message})
             yield build_sse_event("done", {"ok": False})
+            await clear_active_request(request, session_id, active_request.request_id)
             return
 
         chat_store.append_message(session_id=session_id, role="user", content=user_message)
 
         try:
-            async for event in commander.execute_stream(user_query=user_message, session_id=session_id):
+            async for event in commander.execute_stream(
+                user_query=user_message,
+                session_id=session_id,
+                should_cancel=active_request.is_cancelled,
+            ):
                 event_type = event.get("event")
-                if event_type == "delta":
+                if active_request.is_cancelled():
+                    raise CommanderInterruptedError("当前轮次已被中断")
+                if event_type == "process":
+                    yield build_sse_event(
+                        "process",
+                        {
+                            "message": event.get("message", ""),
+                            "stage": event.get("stage", "process"),
+                            "timestamp": event.get("timestamp"),
+                        },
+                    )
+                elif event_type == "delta":
                     text = event.get("text", "")
                     assistant_parts.append(text)
                     yield build_sse_event("delta", {"text": text})
@@ -137,7 +206,10 @@ async def chat_stream(payload: ChatRequest, request: Request):
                     if image_url:
                         yield build_sse_event("image", {"url": image_url})
 
-            final_text = "".join(assistant_parts).strip() or "未能生成有效回复"
+            if active_request.is_cancelled():
+                raise CommanderInterruptedError("当前轮次已被中断")
+
+            final_text = sanitize_assistant_text("".join(assistant_parts).strip()) or "未能生成有效回复"
             chat_store.append_message(
                 session_id=session_id,
                 role="assistant",
@@ -145,16 +217,51 @@ async def chat_stream(payload: ChatRequest, request: Request):
                 image_url=image_url,
             )
             yield build_sse_event("done", {"ok": True})
+        except CommanderInterruptedError:
+            logger.info(f"[web] 当前轮次被中断: session_id={session_id}, request_id={active_request.request_id}")
+            yield build_sse_event(
+                "interrupted",
+                {
+                    "request_id": active_request.request_id,
+                    "message": "本轮已中断。",
+                },
+            )
         except Exception as exc:
             logger.error(f"[web] 处理聊天请求失败: {exc}", exc_info=True)
             error_message = f"请求处理失败：{exc}"
             chat_store.append_message(session_id=session_id, role="assistant", content=error_message)
             yield build_sse_event("error", {"message": error_message})
             yield build_sse_event("done", {"ok": False})
+        finally:
+            await clear_active_request(request, session_id, active_request.request_id)
 
     response = StreamingResponse(event_generator(), media_type="text/event-stream")
     response.headers["Cache-Control"] = "no-cache"
     response.headers["X-Accel-Buffering"] = "no"
+    if created:
+        set_session_cookie(response, session_id)
+    return response
+
+
+@app.post("/api/chat/interrupt")
+async def interrupt_chat(request: Request):
+    session_id, created = ensure_session_id(request)
+    active_request = await get_active_request(request, session_id)
+    interrupted = False
+    request_id = None
+
+    if active_request is not None:
+        active_request.cancel()
+        interrupted = True
+        request_id = active_request.request_id
+
+    response = JSONResponse(
+        {
+            "session_id": session_id,
+            "interrupted": interrupted,
+            "request_id": request_id,
+        }
+    )
     if created:
         set_session_cookie(response, session_id)
     return response

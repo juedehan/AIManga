@@ -31,7 +31,7 @@ class ChatHistoryStore:
         with closing(self._connect()) as conn:
             conn.executescript(
                 """
-                CREATE TABLE IF NOT EXISTS chat_history (
+                chat_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT NOT NULL,
                     role TEXT NOT NULL,
