@@ -1,52 +1,118 @@
-- query: 青灵在非战斗场景下的外貌描写
+- query: 青灵在平时场景下的长相、穿着和眼神描写
   target_character: 青灵
   required_scene: daily
-  required_attributes: [外貌, 身材, 气质]
+  required_attributes: [长相, 穿着, 眼神]
   gold_spans:
     - 马尾女孩名叫青灵，身高1米67
-    - 脸蛋漂亮自不用说
-    - 紧身运动衣下凹凸有致的身体曲线
+    - 脸蛋漂亮自不用说，天天日晒，皮肤还白皙如雪这就很过分了
+    - 紧身运动衣下凹凸有致的身体曲线充满着赏心悦目的艺术之美
+    - 她看男生的眼神总是透露出一股看到苍蝇的生理厌恶
 
-- query: 青灵战斗时的神态描写
+- query: 青灵在战斗场景下的脸色、发丝和神态描写
   target_character: 青灵
   required_scene: battle
-  required_attributes: [神态]
+  required_attributes: [脸色, 发丝, 神态]
   gold_spans:
-    - 青灵御刀飞行，在斗虎身旁降落
-    - 满脸汗水和血水，粘着几缕黑色发丝，胸口起伏剧烈
+    - 青灵御刀飞行，在斗虎身旁降落，她身上也多处战损，满脸汗水和血水，粘着几缕黑色发丝，胸口起伏剧烈。
 
-- query: 李薇薇的衣着描写
+- query: 李薇薇在日常场景下的毛衣、头发和裙摆描写
   target_character: 李薇薇
   required_scene: daily
-  required_attributes: [衣着]
+  required_attributes: [毛衣, 头发, 裙]
   gold_spans:
-    - 李薇薇换上淡绿色的毛衣
-    - 头发柔顺地披在肩上
+    - 李薇薇换上淡绿色的毛衣，平日扎起的头发柔顺地披在肩上。
+    - 风一吹，女孩的头发和裙摆轻轻飞扬
 
-- query: 万思思在水果店时的外貌和衣着描写
+- query: 万思思在水果店日常场景下的制服、脸庞和发型描写
   target_character: 万思思
   required_scene: daily
-  required_attributes: [外貌, 衣着]
+  required_attributes: [制服, 脸庞, 发型]
   gold_spans:
     - 身材纤细的女孩穿着洁白的短袖制服和绀色格子裙
     - 柔顺的中短发搭落在白皙的脸庞上
 
-- query: 高阳父亲的外貌描写
+- query: 高欣欣在日常场景下的校服裙、外貌和状态描写
+  target_character: 高欣欣
+  required_scene: daily
+  required_attributes: [校服裙, 外貌]
+  gold_spans:
+    - 高欣欣出现，她还穿着春夏款的白衬衫和校服裙，背一个大画板，看上去十分单薄。
+    - 高欣欣一张小脸被吹得发白，身体也有些瑟瑟发抖。
+
+- query: 高欣欣在战斗场景下的校服裙、双马尾和鳞片描写
+  target_character: 高欣欣
+  required_scene: battle
+  required_attributes: [校服裙, 发型, 外貌]
+  gold_spans:
+    - 眼前的人，是高欣欣。
+    - 来者是一个十五六岁的黑发少女，穿蓝白色校服裙，扎双马尾，身材纤细，面容姣好
+    - 她大量裸露的肌肤上，包裹着华美的流线型银色鳞片。
+
+- query: 高阳父亲在家庭早餐日常场景下的外貌描写
   required_scene: daily
   required_attributes: [外貌]
   gold_spans:
     - 他高大健壮，小腹有些隆起
     - 眉目间还依稀能见年轻时的俊朗
 
-- query: 青灵对男生的态度和气质描写
+- query: 柳轻盈在日常场景下的比基尼、身材和发型描写
+  target_character: 柳轻盈
+  required_scene: daily
+  required_attributes: [发型, 身材, 衣着]
+  gold_spans:
+    - 柳轻盈半躺在一张沙滩椅上，穿着清凉的比基尼，身材凹凸有致，戴墨镜，头发慵懒地盘起，修长的双手正在给自己紧致的小腹抹防晒霜。
+
+- query: 青灵在日常场景下的比基尼、高马尾和锁骨描写
   target_character: 青灵
   required_scene: daily
-  required_attributes: [气质, 神态]
+  required_attributes: [衣着, 发型, 外貌]
   gold_spans:
-    - 看男生的眼神总是透露出一股看到苍蝇的生理厌恶
-    - 青灵几乎没有追求者
+    - 最惹眼的莫过于青灵，她穿着款式最普通的浅蓝色分体比基尼，身材饱满，曲线毕露，长腿惹眼。
+    - 一头黑发扎成高高的马尾，显得干净利索，露出雪白的天鹅颈，两缕抓漏的秀发垂落下来，搭在精致的锁骨上，更添了几份生动和柔美。
+    - 由于常年练刀，她的肢体动作非常飒爽，加上一张冰山美人不见半分讨好的少女脸庞，碰撞出一种复杂的层次美。
 
-- query: 青灵的酒窝描写
+- query: 朱雀在日常场景下的比基尼、锁骨和腰肢描写
+  target_character: 朱雀
+  required_scene: daily
+  required_attributes: [衣着, 外貌, 身材]
+  gold_spans:
+    - 她头上戴着太阳镜，穿着跟棕色头发一个色系的深色露背比基尼，外面披着一件半透明的薄纱衬衫。
+    - 衬衫的尾部扎起，系在了苗条白皙的腰肢上，纤细的肩和漂亮的锁骨在薄纱下面若隐若现，娇俏含蓄中，成熟女性的气场也不自觉地建立起来。
+
+- query: 高欣欣在日常场景下的围巾、眼神和外貌描写
+  target_character: 高欣欣
+  required_scene: daily
+  required_attributes: [外貌, 眼神]
+  gold_spans:
+    - 脖子上裹着一条温暖厚实的羊毛围巾，挡住下巴和嘴，整张脸只露出了鼻子和眼睛。
+    - 她微微侧目，清澈的双眸望着玻璃窗外的街道，似乎在发呆。
+
+- query: 青灵在日常场景下的酒窝描写
   target_character: 青灵
+  required_scene: daily
+  required_attributes: [外貌]
+  expect_no_answer: true
+
+- query: 李薇薇在日常场景下的耳环描写
+  target_character: 李薇薇
+  required_scene: daily
+  required_attributes: [外貌, 衣着]
+  expect_no_answer: true
+
+- query: 万思思在水果店日常场景下的麻花辫描写
+  target_character: 万思思
+  required_scene: daily
+  required_attributes: [发型]
+  expect_no_answer: true
+
+- query: 朱雀在日常场景下的泪痣描写
+  target_character: 朱雀
+  required_scene: daily
+  required_attributes: [外貌]
+  expect_no_answer: true
+
+- query: 高欣欣在日常场景下的雀斑描写
+  target_character: 高欣欣
+  required_scene: daily
   required_attributes: [外貌]
   expect_no_answer: true

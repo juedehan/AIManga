@@ -409,7 +409,7 @@ if __name__ == "__main__":
         try:
             await commander.setup()
             print("========== 测试 ==========")
-            res = await commander.execute("刚才那张照片变成白色裙子", session_id="demo-session")
+            res = await commander.execute("朱雀在日常场景下的泪痣描写", session_id="demo-session")
             print(res)
         finally:
             await commander.close()
