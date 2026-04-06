@@ -14,7 +14,7 @@ from rag.rag_service import RagSummarizeService
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run retrieval evaluation for the local RAG pipeline.")
+    parser = argparse.ArgumentParser(description="运行本地 RAG 管道的检索评估")
     parser.add_argument(
         "--dataset",
         default="eval/retrieval_eval_samples.yml",

@@ -73,11 +73,12 @@ class EvalResult:
     mode: str
     retrieved_count: int
     top3_hit: int
-    top5_hit: int
     top3_precision: float
-    ndcg5: float
-    scene_constraint_satisfied: bool
-    false_positive: bool
+    ndcg3: float
+    tp: int
+    fp: int
+    tn: int
+    fn: int
 
 
 @dataclass
@@ -536,7 +537,7 @@ class RagSummarizeService:
                 return True
         return False
 
-    def _compute_ndcg(self, relevances: list[int], k: int = 5) -> float:
+    def _compute_ndcg(self, relevances: list[int], k: int = 3) -> float:
         """计算前 k 条结果的 nDCG 指标。"""
         truncated = relevances[:k]
         dcg = sum(rel / log2(index + 2) for index, rel in enumerate(truncated))
@@ -546,42 +547,36 @@ class RagSummarizeService:
             return 0.0
         return dcg / idcg
 
-    def _scene_constraint_satisfied(self, sample: EvalSample, evidence_items: list[EvidenceItem]) -> bool:
-        """检查结果是否满足评测样本要求的场景约束。"""
-        if sample.expect_no_answer:
-            return not evidence_items
-        if not sample.required_scene:
-            return True
-        if not evidence_items:
-            return False
-
-        for evidence in evidence_items:
-            scene_hint = evidence.metadata.get("scene_hint")
-            if sample.required_scene == "daily" and scene_hint == "battle":
-                return False
-            if sample.required_scene == "battle" and scene_hint == "daily":
-                return False
-        return True
-
     def _evaluate_sample(self, sample: EvalSample, evidence_items: list[EvidenceItem], mode: str) -> EvalResult:
         """计算单条评测样本在当前模式下的检索指标。"""
         top5 = evidence_items[:5]
         relevances = [1 if self._evidence_matches_sample(item, sample) else 0 for item in top5]
         top3_hit = 1 if any(relevances[:3]) else 0
-        top5_hit = 1 if any(relevances) else 0
         top3_precision = sum(relevances[:3]) / 3
-        ndcg5 = self._compute_ndcg(relevances, k=5)
-        false_positive = sample.expect_no_answer and bool(top5)
+        ndcg3 = self._compute_ndcg(relevances, k=3)
+        tp = fp = tn = fn = 0
+
+        if sample.expect_no_answer:
+            if evidence_items:
+                fp = 1
+            else:
+                tn = 1
+        elif top3_hit:
+            tp = 1
+        else:
+            fn = 1
+
         return EvalResult(
             query=sample.query,
             mode=mode,
             retrieved_count=len(evidence_items),
             top3_hit=top3_hit,
-            top5_hit=top5_hit,
             top3_precision=top3_precision,
-            ndcg5=ndcg5,
-            scene_constraint_satisfied=self._scene_constraint_satisfied(sample, top5),
-            false_positive=false_positive,
+            ndcg3=ndcg3,
+            tp=tp,
+            fp=fp,
+            tn=tn,
+            fn=fn,
         )
 
     def evaluate_retrieval(self, dataset: str | list[dict[str, Any]], mode: str = "enhanced_retry") -> EvalReport:
@@ -602,18 +597,14 @@ class RagSummarizeService:
             results.append(self._evaluate_sample(sample, evidence_items, mode))
 
         sample_count = len(results) or 1
-        no_answer_results = [result for result, sample in zip(results, samples) if sample.expect_no_answer]
         metrics = {
             "Recall@3": sum(result.top3_hit for result in results) / sample_count,
-            "Recall@5": sum(result.top5_hit for result in results) / sample_count,
             "Precision@3": sum(result.top3_precision for result in results) / sample_count,
-            "nDCG@5": sum(result.ndcg5 for result in results) / sample_count,
-            "scene_constraint_hit_rate": sum(1 for result in results if result.scene_constraint_satisfied) / sample_count,
-            "no_answer_false_positive_rate": (
-                sum(1 for result in no_answer_results if result.false_positive) / len(no_answer_results)
-                if no_answer_results
-                else 0.0
-            ),
+            "nDCG@3": sum(result.ndcg3 for result in results) / sample_count,
+            "TP": sum(result.tp for result in results),
+            "FP": sum(result.fp for result in results),
+            "TN": sum(result.tn for result in results),
+            "FN": sum(result.fn for result in results),
         }
 
         logger.info(f"[RAG-EVAL][{mode}] {metrics}")
